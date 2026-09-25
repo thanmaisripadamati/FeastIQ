@@ -25,3 +25,15 @@ dist-ssr
 *.db
 *.db-shm
 *.db-wal
+
+# Secrets — never commit real API keys
+.env
+.env.local
+.env.*.local
+.env.*
+**/.env
+**/.env.*
+!.env.example
+
+# Vercel
+.vercel

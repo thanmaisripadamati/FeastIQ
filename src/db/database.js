@@ -1,12 +1,53 @@
 import { DatabaseSync } from 'node:sqlite';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, '..', 'feastiq.db');
+
+/**
+ * Resolve the SQLite file path.
+ *
+ * Defaults to `src/feastiq.db` so local development is unchanged.
+ * `FEASTIQ_DB_PATH` allows pointing at a mounted volume on a host that
+ * provides persistent disk.
+ *
+ * IMPORTANT (Vercel): the default path lives inside the deployment bundle,
+ * which is read-only and is NOT persistent. A serverless filesystem is
+ * ephemeral, so FeastIQ on Vercel must supply a writable, persistent
+ * database (e.g. Turso/libSQL/Postgres) via FEASTIQ_DB_PATH. See README.
+ */
+export function resolveDbPath() {
+  const override = process.env.FEASTIQ_DB_PATH;
+  if (typeof override === 'string' && override.trim()) {
+    return path.isAbsolute(override)
+      ? override
+      : path.resolve(process.cwd(), override);
+  }
+  return path.join(__dirname, '..', 'feastiq.db');
+}
 
 export function getDatabase() {
-  const db = new DatabaseSync(DB_PATH);
+  const DB_PATH = resolveDbPath();
+
+  try {
+    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  } catch {
+    // Directory may already exist or be read-only; the open below reports it.
+  }
+
+  let db;
+  try {
+    db = new DatabaseSync(DB_PATH);
+  } catch (err) {
+    throw new Error(
+      'FeastIQ could not open the SQLite database at the configured path. ' +
+        'On ephemeral serverless filesystems (e.g. Vercel) the bundled database ' +
+        'is not writable or not persistent. Set FEASTIQ_DB_PATH to a persistent ' +
+        'location, or switch to a hosted database. Original cause: ' +
+        err.message
+    );
+  }
   
   // Enable WAL mode for high concurrency
   db.exec('PRAGMA journal_mode = WAL;');
