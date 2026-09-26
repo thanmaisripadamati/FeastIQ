@@ -6,7 +6,7 @@
   "installCommand": "npm install",
   "functions": {
     "api/**/*.js": {
-      "runtime": "nodejs24.x",
+      "runtime": "nodejs22.x",
       "maxDuration": 30
     }
   },
